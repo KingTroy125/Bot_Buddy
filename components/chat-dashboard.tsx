@@ -222,6 +222,9 @@ export default function ChatDashboard() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('missing_api_key');
+        }
         throw new Error('Failed to fetch response');
       }
 
@@ -285,8 +288,13 @@ export default function ChatDashboard() {
         }));
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating response:', error);
+      
+      const errorMessage = error.message === 'missing_api_key'
+        ? '⚠️ **API Key Required**\n\nIt looks like you haven\'t added an API key yet.\n\nPlease click on **Settings** in the sidebar to add your Gemini API key so we can chat!'
+        : 'Sorry, I encountered an error while processing your request. Please try again.';
+
       // Add error message
       setChats(prev => prev.map(chat => {
         if (chat.id === currentChatId) {
@@ -295,7 +303,7 @@ export default function ChatDashboard() {
             messages: [...chat.messages, {
               id: crypto.randomUUID(),
               role: 'model',
-              content: 'Sorry, I encountered an error while processing your request. Please try again.',
+              content: errorMessage,
               timestamp: Date.now(),
             }],
             updatedAt: Date.now(),
