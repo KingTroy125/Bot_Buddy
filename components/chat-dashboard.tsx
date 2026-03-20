@@ -47,6 +47,7 @@ export default function ChatDashboard() {
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [userApiKey, setUserApiKey] = useState('');
+  const [claudeApiKey, setClaudeApiKey] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
@@ -75,6 +76,9 @@ export default function ChatDashboard() {
     
     const savedKey = localStorage.getItem('botbuddy-api-key');
     if (savedKey) setUserApiKey(savedKey);
+    
+    const savedClaudeKey = localStorage.getItem('botbuddy-claude-api-key');
+    if (savedClaudeKey) setClaudeApiKey(savedClaudeKey);
     
     const savedUser = localStorage.getItem('botbuddy-user');
     if (savedUser) {
@@ -218,14 +222,24 @@ export default function ChatDashboard() {
           messages,
           userApiKey,
           selectedModel,
+          claudeApiKey,
         }),
       });
 
       if (!response.ok) {
+        let apiError = 'Failed to fetch response';
+        try {
+          const errData = await response.json();
+          apiError = errData.error || apiError;
+        } catch (e) {}
+
         if (response.status === 401) {
+          if (apiError.toLowerCase().includes('invalid') || apiError.includes('401')) {
+            throw new Error('invalid_api_key');
+          }
           throw new Error('missing_api_key');
         }
-        throw new Error('Failed to fetch response');
+        throw new Error(apiError);
       }
 
       const modelMessageId = crypto.randomUUID();
@@ -292,8 +306,10 @@ export default function ChatDashboard() {
       console.error('Error generating response:', error);
       
       const errorMessage = error.message === 'missing_api_key'
-        ? '⚠️ **API Key Required**\n\nIt looks like you haven\'t added an API key yet.\n\nPlease click on **Settings** in the sidebar to add your Gemini API key so we can chat!'
-        : 'Sorry, I encountered an error while processing your request. Please try again.';
+        ? '⚠️ **API Key Required**\n\nIt looks like you haven\'t added an API key yet.\n\nPlease click on **Settings** in the sidebar to add your API key so we can chat!'
+        : error.message === 'invalid_api_key'
+        ? '⚠️ **Invalid API Key**\n\nThe API key you provided is invalid or unauthorized. Please check your Settings and ensure you have correct access.'
+        : `Sorry, I encountered an error: ${error.message}`;
 
       // Add error message
       setChats(prev => prev.map(chat => {
@@ -459,7 +475,7 @@ export default function ChatDashboard() {
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col min-w-0 relative bg-background">
               {/* Header */}
-              <header className="h-14 flex items-center px-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
+              <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                   {!isSidebarOpen && (
                     <button
@@ -473,6 +489,25 @@ export default function ChatDashboard() {
                   <h1 className="font-mono text-xs tracking-widest uppercase text-foreground truncate">
                     {activeChat?.title || 'New Chat'}
                   </h1>
+                </div>
+
+                <div className="relative w-40 sm:w-48">
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => {
+                      setSelectedModel(e.target.value);
+                      localStorage.setItem('botbuddy-model', e.target.value);
+                    }}
+                    className="w-full bg-background border border-border p-1.5 text-[10px] sm:text-xs font-mono focus:outline-none focus:ring-1 focus:ring-foreground appearance-none cursor-pointer"
+                  >
+                    <option className="bg-background text-foreground" value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                    <option className="bg-background text-foreground" value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+                    <option className="bg-background text-foreground" value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash</option>
+                    <option className="bg-background text-foreground" value="claude-4-5-sonnet-beta">Claude Sonnet 4.5 Beta</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
+                    <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
                 </div>
               </header>
 
@@ -681,46 +716,64 @@ export default function ChatDashboard() {
                   )}
                 </div>
 
-                <div className="space-y-3">
-                  <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">Model Selection</label>
-                  <div className="relative">
-                    <select
-                      value={selectedModel}
-                      onChange={(e) => {
-                        setSelectedModel(e.target.value);
-                        localStorage.setItem('botbuddy-model', e.target.value);
-                      }}
-                      className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground appearance-none cursor-pointer"
-                    >
-                      <option className="bg-background text-foreground" value="gemini-3-flash-preview">Gemini 3 Flash (Default)</option>
-                      <option className="bg-background text-foreground" value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-                      <option className="bg-background text-foreground" value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+
+
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">Select Active Model</label>
+                    <div className="relative">
+                      <select
+                        value={selectedModel}
+                        onChange={(e) => {
+                          setSelectedModel(e.target.value);
+                          localStorage.setItem('botbuddy-model', e.target.value);
+                        }}
+                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground appearance-none cursor-pointer"
+                      >
+                        <option className="bg-background text-foreground" value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                        <option className="bg-background text-foreground" value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+                        <option className="bg-background text-foreground" value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash</option>
+                        <option className="bg-background text-foreground" value="claude-4-5-sonnet-beta">Claude Sonnet 4.5 Beta</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-3">
-                  <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">Gemini API Key</label>
-                  <input
-                    type="password"
-                    value={userApiKey}
-                    onChange={(e) => {
-                      setUserApiKey(e.target.value);
-                      if (e.target.value) {
-                        localStorage.setItem('botbuddy-api-key', e.target.value);
-                      } else {
-                        localStorage.removeItem('botbuddy-api-key');
-                      }
-                    }}
-                    placeholder="Enter your API key"
-                    className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
-                  />
-                  <p className="text-[10px] text-muted-foreground font-mono leading-relaxed">
-                    Leave empty to use the default system key. Your key is stored locally in your browser and never sent to our servers.
-                  </p>
+                  <div className="space-y-3 pt-2 border-t border-border">
+                    <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                      {selectedModel.startsWith('claude') ? 'Claude API Key' : 'Gemini API Key'}
+                    </label>
+                    {selectedModel.startsWith('claude') ? (
+                      <input
+                        type="password"
+                        value={claudeApiKey}
+                        onChange={(e) => {
+                          setClaudeApiKey(e.target.value);
+                          if (e.target.value) localStorage.setItem('botbuddy-claude-api-key', e.target.value);
+                          else localStorage.removeItem('botbuddy-claude-api-key');
+                        }}
+                        placeholder="Enter your Claude API key"
+                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
+                      />
+                    ) : (
+                      <input
+                        type="password"
+                        value={userApiKey}
+                        onChange={(e) => {
+                          setUserApiKey(e.target.value);
+                          if (e.target.value) localStorage.setItem('botbuddy-api-key', e.target.value);
+                          else localStorage.removeItem('botbuddy-api-key');
+                        }}
+                        placeholder="Enter your Gemini API key"
+                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
+                      />
+                    )}
+                    <p className="text-[10px] text-muted-foreground font-mono leading-relaxed">
+                      Leave empty to use the default system key. Your key is stored locally in your browser and never sent to our servers.
+                    </p>
+                  </div>
                 </div>
               </div>
 

@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "^1.44.0",
     "@hookform/resolvers": "^3.10.0",
