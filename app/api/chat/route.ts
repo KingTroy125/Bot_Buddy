@@ -3,6 +3,8 @@ import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 60; // Set max duration for Vercel
 
+const SYSTEM_INSTRUCTION = "You are BotBuddy, a helpful, friendly, and intelligent AI assistant. If the user asks for a picture, photo, logo, or image to be drawn/generated of anything, ALWAYS respond with the following exact markdown format: ![Description](https://image.pollinations.ai/prompt/<encoded_description>?width=800&height=800&nologo=true) Replace <encoded_description> with the detailed visual prompt of what they requested securely URL-encoded. You must not use code blocks for the image, just output the raw markdown tag.";
+
 export async function POST(req: Request) {
   try {
     const { messages, userApiKey, selectedModel, claudeApiKey } = await req.json();
@@ -19,11 +21,23 @@ export async function POST(req: Request) {
       const stream = await anthropic.messages.create({
         model: selectedModel,
         max_tokens: 1024,
-        messages: messages.map((m: any) => ({
-          role: m.role === 'model' ? 'assistant' : 'user',
-          content: m.content
-        })),
-        system: "You are BotBuddy, a helpful, friendly, and intelligent AI assistant. Provide clear, concise, and accurate answers.",
+        messages: messages.map((m: any) => {
+          if (m.role === 'model') return { role: 'assistant', content: m.content };
+          if (m.images && m.images.length > 0) {
+            return {
+              role: 'user',
+              content: [
+                ...m.images.map((img: any) => ({
+                  type: 'image',
+                  source: { type: 'base64', media_type: img.mimeType, data: img.data }
+                })),
+                { type: 'text', text: m.content }
+              ]
+            };
+          }
+          return { role: 'user', content: m.content };
+        }),
+        system: SYSTEM_INSTRUCTION,
         stream: true
       });
 
@@ -60,16 +74,29 @@ export async function POST(req: Request) {
 
     const ai = new GoogleGenAI({ apiKey: apiKeyToUse });
 
-    const contents = messages.map((m: any) => ({
-      role: m.role,
-      parts: [{ text: m.content }]
-    }));
+    const contents = messages.map((m: any) => {
+      if (m.images && m.images.length > 0) {
+        return {
+          role: m.role,
+          parts: [
+            ...m.images.map((img: any) => ({
+              inlineData: { data: img.data, mimeType: img.mimeType }
+            })),
+            { text: m.content }
+          ]
+        };
+      }
+      return {
+        role: m.role,
+        parts: [{ text: m.content }]
+      };
+    });
 
     const response = await ai.models.generateContentStream({
       model: selectedModel || 'gemini-3-flash-preview',
       contents: contents,
       config: {
-        systemInstruction: "You are BotBuddy, a helpful, friendly, and intelligent AI assistant. Provide clear, concise, and accurate answers.",
+        systemInstruction: SYSTEM_INSTRUCTION,
       }
     });
 

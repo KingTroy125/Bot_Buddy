@@ -14,7 +14,9 @@ import {
   PanelLeftOpen,
   Settings,
   Sparkles,
-  X
+  X,
+  Paperclip,
+  ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence, MotionConfig, type Transition } from 'motion/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
@@ -23,11 +25,14 @@ import { cn } from '@/lib/utils';
 
 const transition: Transition = { type: "spring", bounce: 0, duration: 0.4 };
 
+type Attachment = { name: string, data: string, type: 'image' | 'text', mimeType: string };
+
 type Message = {
   id: string;
   role: 'user' | 'model';
   content: string;
   timestamp: number;
+  images?: { name: string, data: string, mimeType: string }[];
 };
 
 type Chat = {
@@ -54,6 +59,8 @@ export default function ChatDashboard() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   // Load chats and settings from localStorage on mount
   useEffect(() => {
@@ -159,12 +166,51 @@ export default function ChatDashboard() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const reader = new FileReader();
+
+      if (file.type.startsWith('image/')) {
+        reader.onload = (event) => {
+          const base64String = (event.target?.result as string).split(',')[1];
+          setAttachments(prev => [...prev, { name: file.name, data: base64String, type: 'image', mimeType: file.type }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload = (event) => {
+          setAttachments(prev => [...prev, { name: file.name, data: event.target?.result as string, type: 'text', mimeType: file.type }]);
+        };
+        reader.readAsText(file);
+      }
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachments.length === 0) || isLoading) return;
 
     const userMessageContent = input.trim();
+    
+    const imageAttachments = attachments.filter(a => a.type === 'image');
+    const textAttachmentsContent = attachments
+      .filter(a => a.type === 'text')
+      .map(a => `\n\n--- File: ${a.name} ---\n${a.data}\n--- End File ---`)
+      .join('');
+      
+    const finalUserContent = userMessageContent + textAttachmentsContent;
+
     setInput('');
+    setAttachments([]);
     setIsLoading(true);
 
     let currentChatId = activeChatId;
@@ -187,8 +233,9 @@ export default function ChatDashboard() {
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: userMessageContent,
+      content: finalUserContent,
       timestamp: Date.now(),
+      images: imageAttachments.length > 0 ? imageAttachments.map(img => ({ name: img.name, data: img.data, mimeType: img.mimeType })) : undefined
     };
 
     // Add user message to UI immediately
@@ -208,10 +255,11 @@ export default function ChatDashboard() {
       const currentChat = chats.find(c => c.id === currentChatId);
       const history = currentChat?.messages.map(m => ({
         role: m.role,
-        content: m.content
+        content: m.content,
+        images: m.images
       })) || [];
       
-      const messages = [...history, { role: 'user', content: userMessageContent }];
+      const messages = [...history, { role: 'user', content: finalUserContent, images: userMessage.images }];
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -569,7 +617,16 @@ export default function ChatDashboard() {
                           }`}
                         >
                           {message.role === 'user' ? (
-                            <div className="whitespace-pre-wrap break-words text-[14px] md:text-[15px] leading-relaxed">{message.content}</div>
+                            <div className="flex flex-col gap-3">
+                              {message.images && message.images.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {message.images.map((img, i) => (
+                                    <img key={i} src={`data:${img.mimeType};base64,${img.data}`} alt={img.name} className="w-48 h-auto object-contain rounded-sm border border-border/50" />
+                                  ))}
+                                </div>
+                              )}
+                              <div className="whitespace-pre-wrap break-words text-[14px] md:text-[15px] leading-relaxed">{message.content}</div>
+                            </div>
                           ) : (
                             <MarkdownRenderer content={message.content} />
                           )}
@@ -600,26 +657,62 @@ export default function ChatDashboard() {
 
               {/* Input Area */}
               <div className="p-2 sm:p-4 bg-background border-t border-border">
-                <div className="max-w-3xl mx-auto w-full relative">
+                <div className="max-w-3xl mx-auto w-full relative flex flex-col gap-2">
+                  {/* Staged Attachments */}
+                  {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-1">
+                      {attachments.map((att, i) => (
+                        <div key={i} className="relative group bg-muted border border-border px-3 py-1.5 flex items-center gap-2 text-xs font-mono truncate max-w-[200px]">
+                          {att.type === 'image' ? <ImageIcon size={12} className="shrink-0" /> : <Paperclip size={12} className="shrink-0" />}
+                          <span className="truncate">{att.name}</span>
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveAttachment(i)} 
+                            className="absolute -top-1.5 -right-1.5 bg-foreground text-background rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <form
                     onSubmit={handleSubmit}
                     className="relative flex items-end gap-2 bg-background border border-border p-2 focus-within:ring-1 focus-within:ring-foreground transition-all"
                   >
+                    <input 
+                      type="file" 
+                      multiple 
+                      ref={fileInputRef} 
+                      onChange={handleFileChange} 
+                      className="hidden" 
+                      accept="image/*,.txt,.md,.csv,.json"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="size-10 text-muted-foreground hover:text-foreground transition-colors shrink-0 mb-0.5 ml-0.5 flex items-center justify-center"
+                      title="Attach Image or File"
+                    >
+                      <Paperclip size={18} />
+                    </button>
+
                     <textarea
                       ref={textareaRef}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message..."
-                      className="w-full max-h-[200px] min-h-[44px] bg-transparent border-0 focus:ring-0 resize-none py-3 px-3 text-[15px] text-foreground placeholder:text-muted-foreground custom-scrollbar"
+                      className="w-full max-h-[200px] min-h-[44px] bg-transparent border-0 focus:ring-0 resize-none py-3 px-1 text-[15px] text-foreground placeholder:text-muted-foreground custom-scrollbar"
                       rows={1}
                     />
                     <button
                       type="submit"
-                      disabled={!input.trim() || isLoading}
+                      disabled={(!input.trim() && attachments.length === 0) || isLoading}
                       className="size-10 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors shrink-0 mb-0.5 mr-0.5 flex items-center justify-center"
                     >
-                      <Send size={16} className={input.trim() && !isLoading ? 'translate-x-[1px] -translate-y-[1px] transition-transform' : ''} />
+                      <Send size={16} className={(input.trim() || attachments.length > 0) && !isLoading ? 'translate-x-[1px] -translate-y-[1px] transition-transform' : ''} />
                     </button>
                   </form>
                   <div className="text-center mt-3 font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
