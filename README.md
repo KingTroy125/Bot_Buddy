@@ -1,6 +1,6 @@
 <img
   alt="Bot Buddy - Intelligent AI Assistant"
-  src="https://raw.githubusercontent.com/KingTroy125/Bot_Buddy/main/public/1.png"
+  src="https://raw.githubusercontent.com/KingTroy125/Bot_Buddy/main/public/2.png"
   width="100%"
 />
 
