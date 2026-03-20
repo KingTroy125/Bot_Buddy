@@ -9,7 +9,7 @@ import Link from 'next/link';
 const fadeUp = (delay: number) => ({
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] },
+  transition: { duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
 });
 
 export default function Hero() {
@@ -115,11 +115,11 @@ export default function Hero() {
 
         {/* Dashboard Image Block */}
         <motion.div
-          className="relative"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        >
+  className="relative"
+  initial={{ opacity: 0, y: 40 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+>
           {/* Layer 1 - outer border frame */}
           <div className="mx-4 border-x border-border sm:mx-8 md:mx-12">
             {/* Layer 2 - inner border frame */}
