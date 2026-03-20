@@ -127,7 +127,7 @@ export default function Hero() {
               {/* Image */}
               <div className="relative overflow-hidden">
                 <img
-                  src="https://opencal-nextjs.vercel.app/12.png"
+                  src="https://raw.githubusercontent.com/KingTroy125/Bot_Buddy/main/public/2.png"
                   alt="Dashboard preview"
                   width="auto"
                   height="auto"
