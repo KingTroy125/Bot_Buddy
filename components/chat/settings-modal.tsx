@@ -122,7 +122,7 @@ export function SettingsModal({
                     </div>
                   </div>
                 </div>
-
+                
                 <div className="space-y-3 pt-2 border-t border-border">
                   <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
                     {selectedModel.startsWith('claude') ? 'Claude API Key' : selectedModel === 'toqan-agent' ? 'Toqan API Key' : 'Gemini API Key'}
@@ -132,8 +132,9 @@ export function SettingsModal({
                       type="password"
                       value={claudeApiKey}
                       onChange={(e) => {
+                        const val = e.target.value.trim();
                         setClaudeApiKey(e.target.value);
-                        if (e.target.value) localStorage.setItem('botbuddy-claude-api-key', e.target.value);
+                        if (val) localStorage.setItem('botbuddy-claude-api-key', val);
                         else localStorage.removeItem('botbuddy-claude-api-key');
                       }}
                       placeholder="Enter your Claude API key"
@@ -144,8 +145,9 @@ export function SettingsModal({
                       type="password"
                       value={toqanApiKey}
                       onChange={(e) => {
+                        const val = e.target.value.trim();
                         setToqanApiKey(e.target.value);
-                        if (e.target.value) localStorage.setItem('botbuddy-toqan-api-key', e.target.value);
+                        if (val) localStorage.setItem('botbuddy-toqan-api-key', val);
                         else localStorage.removeItem('botbuddy-toqan-api-key');
                       }}
                       placeholder="Enter your Toqan API key"
@@ -156,8 +158,9 @@ export function SettingsModal({
                       type="password"
                       value={userApiKey}
                       onChange={(e) => {
+                        const val = e.target.value.trim();
                         setUserApiKey(e.target.value);
-                        if (e.target.value) localStorage.setItem('botbuddy-api-key', e.target.value);
+                        if (val) localStorage.setItem('botbuddy-api-key', val);
                         else localStorage.removeItem('botbuddy-api-key');
                       }}
                       placeholder="Enter your Gemini API key"

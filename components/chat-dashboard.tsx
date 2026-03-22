@@ -243,10 +243,10 @@ export default function ChatDashboard() {
         },
         body: JSON.stringify({
           messages,
-          userApiKey,
+          userApiKey: userApiKey?.trim(),
           selectedModel,
-          claudeApiKey,
-          toqanApiKey,
+          claudeApiKey: claudeApiKey?.trim(),
+          toqanApiKey: toqanApiKey?.trim(),
           toqanConversationId: activeChat?.toqanConversationId,
         }),
       });
@@ -255,11 +255,21 @@ export default function ChatDashboard() {
         let apiError = 'Failed to fetch response';
         try {
           const errData = await response.json();
-          apiError = errData.error || apiError;
+          // Extract message from potential nested JSON structure
+          apiError = typeof errData.error === 'string' ? errData.error : (errData.error?.message || JSON.stringify(errData.error) || apiError);
+          
+          // Try to parse nested error message if it's a JSON string
+          if (typeof apiError === 'string' && apiError.startsWith('{')) {
+            try {
+              const nested = JSON.parse(apiError);
+              apiError = nested.error?.message || apiError;
+            } catch (e) {}
+          }
         } catch (e) {}
 
-        if (response.status === 401) {
-          if (apiError.toLowerCase().includes('invalid') || apiError.includes('401')) {
+        const lowerError = apiError.toLowerCase();
+        if (response.status === 401 || lowerError.includes('api key not valid') || lowerError.includes('api_key_invalid')) {
+          if (lowerError.includes('invalid') || lowerError.includes('401') || lowerError.includes('api key not valid') || lowerError.includes('api_key_invalid')) {
             throw new Error('invalid_api_key');
           }
           throw new Error('missing_api_key');
@@ -341,11 +351,28 @@ export default function ChatDashboard() {
     } catch (error: any) {
       console.error('Error generating response:', error);
       
-      const errorMessage = error.message === 'missing_api_key'
+      let displayMessage = error.message;
+      
+      // Attempt to clean up any leaked JSON strings in the message
+      if (typeof displayMessage === 'string' && (displayMessage.includes('"{') || displayMessage.includes('{"'))) {
+        try {
+          // Extract JSON if it's wrapped in quotes or just a string
+          const jsonStr = displayMessage.includes('"{') 
+            ? displayMessage.match(/"({.*?})"/)?.[1] 
+            : displayMessage.match(/({.*?})/)?.[1];
+            
+          if (jsonStr) {
+            const nested = JSON.parse(jsonStr);
+            displayMessage = nested.error?.message || nested.message || displayMessage;
+          }
+        } catch (e) {}
+      }
+
+      const errorMessage = displayMessage === 'missing_api_key'
         ? '⚠️ **API Key Required**\n\nIt looks like you haven\'t added an API key yet.\n\nPlease click on **Settings** in the sidebar to add your API key so we can chat!'
-        : error.message === 'invalid_api_key'
+        : displayMessage === 'invalid_api_key'
         ? '⚠️ **Invalid API Key**\n\nThe API key you provided is invalid or unauthorized. Please check your Settings and ensure you have correct access.'
-        : `Sorry, I encountered an error: ${error.message}`;
+        : `Sorry, I encountered an error: ${displayMessage}`;
 
       // Add error message
       setChats(prev => prev.map(chat => {
