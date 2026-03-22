@@ -40,6 +40,7 @@ type Chat = {
   title: string;
   messages: Message[];
   updatedAt: number;
+  toqanConversationId?: string;
 };
 
 export default function ChatDashboard() {
@@ -53,6 +54,7 @@ export default function ChatDashboard() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [userApiKey, setUserApiKey] = useState('');
   const [claudeApiKey, setClaudeApiKey] = useState('');
+  const [toqanApiKey, setToqanApiKey] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
@@ -86,6 +88,9 @@ export default function ChatDashboard() {
     
     const savedClaudeKey = localStorage.getItem('botbuddy-claude-api-key');
     if (savedClaudeKey) setClaudeApiKey(savedClaudeKey);
+    
+    const savedToqanKey = localStorage.getItem('botbuddy-toqan-api-key');
+    if (savedToqanKey) setToqanApiKey(savedToqanKey);
     
     const savedUser = localStorage.getItem('botbuddy-user');
     if (savedUser) {
@@ -271,6 +276,8 @@ export default function ChatDashboard() {
           userApiKey,
           selectedModel,
           claudeApiKey,
+          toqanApiKey,
+          toqanConversationId: activeChat?.toqanConversationId,
         }),
       });
 
@@ -288,6 +295,17 @@ export default function ChatDashboard() {
           throw new Error('missing_api_key');
         }
         throw new Error(apiError);
+      }
+
+      // Check for Toqan Conversation ID in headers
+      const receivedToqanId = response.headers.get('X-Toqan-Conversation-Id');
+      if (receivedToqanId) {
+        setChats(prev => prev.map(chat => {
+          if (chat.id === currentChatId) {
+            return { ...chat, toqanConversationId: receivedToqanId };
+          }
+          return chat;
+        }));
       }
 
       const modelMessageId = crypto.randomUUID();
@@ -552,6 +570,7 @@ export default function ChatDashboard() {
                     <option className="bg-background text-foreground" value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
                     <option className="bg-background text-foreground" value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash</option>
                     <option className="bg-background text-foreground" value="claude-4-5-sonnet-beta">Claude Sonnet 4.5 Beta</option>
+                    <option className="bg-background text-foreground" value="toqan-agent">Toqan Agent</option>
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
                     <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
@@ -827,6 +846,7 @@ export default function ChatDashboard() {
                         <option className="bg-background text-foreground" value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
                         <option className="bg-background text-foreground" value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash</option>
                         <option className="bg-background text-foreground" value="claude-4-5-sonnet-beta">Claude Sonnet 4.5 Beta</option>
+                        <option className="bg-background text-foreground" value="toqan-agent">Toqan Agent</option>
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
                         <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
@@ -836,7 +856,7 @@ export default function ChatDashboard() {
 
                   <div className="space-y-3 pt-2 border-t border-border">
                     <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
-                      {selectedModel.startsWith('claude') ? 'Claude API Key' : 'Gemini API Key'}
+                      {selectedModel.startsWith('claude') ? 'Claude API Key' : selectedModel === 'toqan-agent' ? 'Toqan API Key' : 'Gemini API Key'}
                     </label>
                     {selectedModel.startsWith('claude') ? (
                       <input
@@ -848,6 +868,18 @@ export default function ChatDashboard() {
                           else localStorage.removeItem('botbuddy-claude-api-key');
                         }}
                         placeholder="Enter your Claude API key"
+                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
+                      />
+                    ) : selectedModel === 'toqan-agent' ? (
+                      <input
+                        type="password"
+                        value={toqanApiKey}
+                        onChange={(e) => {
+                          setToqanApiKey(e.target.value);
+                          if (e.target.value) localStorage.setItem('botbuddy-toqan-api-key', e.target.value);
+                          else localStorage.removeItem('botbuddy-toqan-api-key');
+                        }}
+                        placeholder="Enter your Toqan API key"
                         className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
                       />
                     ) : (
