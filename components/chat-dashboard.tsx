@@ -1,47 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Bot, 
-  User, 
-  Send, 
-  Menu, 
-  Plus, 
-  MessageSquare, 
-  Trash2, 
-  MoreVertical,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
-  Sparkles,
-  X,
-  Paperclip,
-  ImageIcon
-} from 'lucide-react';
 import { motion, AnimatePresence, MotionConfig, type Transition } from 'motion/react';
-import { MarkdownRenderer } from '@/components/MarkdownRenderer';
-import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const transition: Transition = { type: "spring", bounce: 0, duration: 0.4 };
 
-type Attachment = { name: string, data: string, type: 'image' | 'text', mimeType: string };
-
-type Message = {
-  id: string;
-  role: 'user' | 'model';
-  content: string;
-  timestamp: number;
-  images?: { name: string, data: string, mimeType: string }[];
-};
-
-type Chat = {
-  id: string;
-  title: string;
-  messages: Message[];
-  updatedAt: number;
-  toqanConversationId?: string;
-};
+import { Sidebar } from './chat/sidebar';
+import { ChatHeader } from './chat/chat-header';
+import { MessageList } from './chat/message-list';
+import { MessageInput } from './chat/message-input';
+import { SettingsModal } from './chat/settings-modal';
+import { Attachment, Message, Chat } from './chat/types';
 
 export default function ChatDashboard() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -448,297 +418,48 @@ export default function ChatDashboard() {
           />
 
           <div className="flex-1 flex overflow-hidden relative">
-            {/* Sidebar */}
-            <AnimatePresence mode="wait">
-              {isSidebarOpen && (
-                <motion.div
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 280, opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  className="h-full bg-background flex flex-col border-r border-border shrink-0 z-20 absolute md:relative"
-                >
-                  <div className="p-4 flex items-center justify-between border-b border-border">
-                    <div className="flex items-center gap-2 font-mono text-sm font-medium tracking-widest uppercase text-foreground">
-                      <div className="w-6 h-6 bg-foreground flex items-center justify-center">
-                        <Bot size={14} className="text-background" />
-                      </div>
-                      BotBuddy
-                    </div>
-                    <button 
-                      onClick={() => setIsSidebarOpen(false)}
-                      className="p-1.5 hover:bg-muted text-muted-foreground md:hidden border border-transparent hover:border-border transition-colors"
-                    >
-                      <PanelLeftClose size={16} />
-                    </button>
-                  </div>
-
-                  <div className="p-4 border-b border-border">
-                    <button
-                      onClick={createNewChat}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-foreground hover:bg-foreground/90 text-background transition-colors text-xs font-mono tracking-widest uppercase"
-                    >
-                      <Plus size={14} />
-                      New Chat
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                    {chats.length === 0 ? (
-                      <div className="text-center text-muted-foreground font-mono text-[10px] tracking-widest uppercase mt-10 px-4">
-                        No chats yet.
-                      </div>
-                    ) : (
-                      chats.sort((a, b) => b.updatedAt - a.updatedAt).map(chat => (
-                        <div
-                          key={chat.id}
-                          onClick={() => {
-                            setActiveChatId(chat.id);
-                            if (window.innerWidth < 768) setIsSidebarOpen(false);
-                          }}
-                          className={`group flex items-center justify-between px-3 py-2 cursor-pointer transition-colors text-sm border ${
-                            activeChatId === chat.id 
-                              ? 'bg-muted border-border text-foreground' 
-                              : 'bg-transparent border-transparent hover:bg-muted/50 text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <MessageSquare size={14} className="shrink-0 opacity-70" />
-                            <span className="truncate font-medium">{chat.title}</span>
-                          </div>
-                          <button
-                            onClick={(e) => deleteChat(e, chat.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all shrink-0"
-                            title="Delete chat"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="p-4 border-t border-border flex flex-col gap-2">
-                    {isLoggedIn ? (
-                      <div className="flex items-center justify-between px-3 py-2 text-xs font-mono tracking-widest uppercase text-foreground border border-border bg-muted/30">
-                        <div className="flex items-center gap-2 truncate">
-                          <User size={14} className="opacity-70 shrink-0" />
-                          <span className="truncate">{username}</span>
-                        </div>
-                      </div>
-                    ) : null}
-                    <button
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-xs font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground cursor-pointer border border-transparent hover:border-border hover:bg-muted/50 transition-colors"
-                    >
-                      <Settings size={14} className="opacity-70" />
-                      Settings
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <Sidebar 
+              isSidebarOpen={isSidebarOpen}
+              setIsSidebarOpen={setIsSidebarOpen}
+              chats={chats}
+              activeChatId={activeChatId}
+              setActiveChatId={setActiveChatId}
+              createNewChat={createNewChat}
+              deleteChat={deleteChat}
+              isLoggedIn={isLoggedIn}
+              username={username}
+              setIsSettingsOpen={setIsSettingsOpen}
+            />
 
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col min-w-0 relative bg-background">
-              {/* Header */}
-              <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
-                <div className="flex items-center gap-3">
-                  {!isSidebarOpen && (
-                    <button
-                      onClick={() => setIsSidebarOpen(true)}
-                      className="p-1.5 hover:bg-muted border border-transparent hover:border-border text-muted-foreground transition-colors"
-                      title="Open sidebar"
-                    >
-                      <PanelLeftOpen size={16} />
-                    </button>
-                  )}
-                  <h1 className="font-mono text-xs tracking-widest uppercase text-foreground truncate">
-                    {activeChat?.title || 'New Chat'}
-                  </h1>
-                </div>
+              <ChatHeader 
+                activeChatTitle={activeChat?.title || 'New Chat'}
+                isSidebarOpen={isSidebarOpen}
+                setIsSidebarOpen={setIsSidebarOpen}
+                selectedModel={selectedModel}
+                setSelectedModel={setSelectedModel}
+              />
 
-                <div className="relative w-40 sm:w-48">
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => {
-                      setSelectedModel(e.target.value);
-                      localStorage.setItem('botbuddy-model', e.target.value);
-                    }}
-                    className="w-full bg-background border border-border p-1.5 text-[10px] sm:text-xs font-mono focus:outline-none focus:ring-1 focus:ring-foreground appearance-none cursor-pointer"
-                  >
-                    <option className="bg-background text-foreground" value="gemini-3-flash-preview">Gemini 3 Flash</option>
-                    <option className="bg-background text-foreground" value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-                    <option className="bg-background text-foreground" value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash</option>
-                    <option className="bg-background text-foreground" value="claude-4-5-sonnet-beta">Claude Sonnet 4.5 Beta</option>
-                    <option className="bg-background text-foreground" value="toqan-agent">Toqan Agent</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
-                    <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                  </div>
-                </div>
-              </header>
+              <MessageList 
+                messages={activeChat?.messages || []}
+                isLoading={isLoading}
+                messagesEndRef={messagesEndRef}
+                setInput={setInput}
+              />
 
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
-                <div className="max-w-3xl mx-auto w-full space-y-8 pb-20">
-                  {!activeChat || activeChat.messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center mt-20">
-                      <div className="w-16 h-16 bg-muted border border-border text-foreground flex items-center justify-center mb-8 pr-1">
-                        <Bot size={32} />
-                      </div>
-                      <h2 className="text-2xl font-medium text-foreground mb-4 tracking-tight">How can I help you today?</h2>
-                      <p className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase max-w-md mb-12">
-                        I&apos;m BotBuddy, your intelligent AI assistant.
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
-                        {[
-                          "Explain quantum computing in simple terms",
-                          "Write a python script to scrape a website",
-                          "Give me ideas for a weekend getaway",
-                          "Help me write a professional email"
-                        ].map((suggestion, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setInput(suggestion)}
-                            className="p-4 bg-background border border-border text-left hover:bg-muted transition-all text-sm text-foreground"
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    activeChat.messages.map((message) => (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        key={message.id}
-                        className={`flex flex-col gap-2 ${message.role === 'user' ? 'items-end' : 'items-start'}`}
-                      >
-                        <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase text-muted-foreground px-1">
-                          {message.role === 'model' ? (
-                            <>
-                              <Bot size={12} />
-                              <span>BotBuddy</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>You</span>
-                              <User size={12} />
-                            </>
-                          )}
-                        </div>
-                        <div
-                          className={`max-w-[90%] md:max-w-[85%] px-4 py-3 md:px-5 md:py-4 border ${
-                            message.role === 'user'
-                              ? 'bg-foreground text-background border-foreground'
-                              : 'bg-background text-foreground border-border'
-                          }`}
-                        >
-                          {message.role === 'user' ? (
-                            <div className="flex flex-col gap-3">
-                              {message.images && message.images.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {message.images.map((img, i) => (
-                                    <img key={i} src={`data:${img.mimeType};base64,${img.data}`} alt={img.name} className="w-48 h-auto object-contain rounded-sm border border-border/50" />
-                                  ))}
-                                </div>
-                              )}
-                              <div className="whitespace-pre-wrap break-words text-[14px] md:text-[15px] leading-relaxed">{message.content}</div>
-                            </div>
-                          ) : (
-                            <MarkdownRenderer content={message.content} />
-                          )}
-                        </div>
-                      </motion.div>
-                    ))
-                  )}
-                  {isLoading && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex flex-col gap-2 items-start"
-                    >
-                      <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase text-muted-foreground px-1">
-                        <Bot size={12} />
-                        <span>BotBuddy</span>
-                      </div>
-                      <div className="bg-background border border-border px-5 py-4 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-1.5 h-1.5 bg-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-1.5 h-1.5 bg-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    </motion.div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              </div>
-
-              {/* Input Area */}
-              <div className="p-2 sm:p-4 bg-background border-t border-border">
-                <div className="max-w-3xl mx-auto w-full relative flex flex-col gap-2">
-                  {/* Staged Attachments */}
-                  {attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-1">
-                      {attachments.map((att, i) => (
-                        <div key={i} className="relative group bg-muted border border-border px-3 py-1.5 flex items-center gap-2 text-xs font-mono truncate max-w-[200px]">
-                          {att.type === 'image' ? <ImageIcon size={12} className="shrink-0" /> : <Paperclip size={12} className="shrink-0" />}
-                          <span className="truncate">{att.name}</span>
-                          <button 
-                            type="button"
-                            onClick={() => handleRemoveAttachment(i)} 
-                            className="absolute -top-1.5 -right-1.5 bg-foreground text-background rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <form
-                    onSubmit={handleSubmit}
-                    className="relative flex items-end gap-2 bg-background border border-border p-2 focus-within:ring-1 focus-within:ring-foreground transition-all"
-                  >
-                    <input 
-                      type="file" 
-                      multiple 
-                      ref={fileInputRef} 
-                      onChange={handleFileChange} 
-                      className="hidden" 
-                      accept="image/*,.txt,.md,.csv,.json"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="size-10 text-muted-foreground hover:text-foreground transition-colors shrink-0 mb-0.5 ml-0.5 flex items-center justify-center"
-                      title="Attach Image or File"
-                    >
-                      <Paperclip size={18} />
-                    </button>
-
-                    <textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type your message..."
-                      className="w-full max-h-[200px] min-h-[44px] bg-transparent border-0 focus:ring-0 resize-none py-3 px-1 text-[15px] text-foreground placeholder:text-muted-foreground custom-scrollbar"
-                      rows={1}
-                    />
-                    <button
-                      type="submit"
-                      disabled={(!input.trim() && attachments.length === 0) || isLoading}
-                      className="size-10 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors shrink-0 mb-0.5 mr-0.5 flex items-center justify-center"
-                    >
-                      <Send size={16} className={(input.trim() || attachments.length > 0) && !isLoading ? 'translate-x-[1px] -translate-y-[1px] transition-transform' : ''} />
-                    </button>
-                  </form>
-                  <div className="text-center mt-3 font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
-                    BotBuddy can make mistakes. Consider verifying important information.
-                  </div>
-                </div>
-              </div>
+              <MessageInput 
+                input={input}
+                setInput={setInput}
+                attachments={attachments}
+                handleFileChange={handleFileChange}
+                handleRemoveAttachment={handleRemoveAttachment}
+                handleSubmit={handleSubmit}
+                isLoading={isLoading}
+                textareaRef={textareaRef}
+                fileInputRef={fileInputRef}
+                handleKeyDown={handleKeyDown}
+              />
             </div>
 
             {/* Mobile Sidebar Overlay */}
@@ -766,154 +487,22 @@ export default function ChatDashboard() {
         </div>
       </div>
 
-      {/* Settings Modal */}
-      <AnimatePresence>
-        {isSettingsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-background border border-border w-full max-w-md p-6 flex flex-col gap-6 shadow-2xl"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="font-mono text-sm font-medium tracking-widest uppercase text-foreground">Settings</h2>
-                <button onClick={() => setIsSettingsOpen(false)} className="text-muted-foreground hover:text-foreground">
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">Account</label>
-                  {isLoggedIn ? (
-                    <div className="flex items-center justify-between p-3 border border-border bg-muted/30">
-                      <div className="flex items-center gap-2">
-                        <User size={14} className="text-foreground" />
-                        <span className="font-mono text-xs text-foreground">{username}</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setIsLoggedIn(false);
-                          setUsername('');
-                          localStorage.removeItem('botbuddy-user');
-                        }} 
-                        className="text-[10px] font-mono text-red-500 hover:text-red-600 uppercase tracking-widest"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="Enter username"
-                        className="flex-1 bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
-                      />
-                      <button
-                        onClick={() => {
-                          if (username.trim()) {
-                            setIsLoggedIn(true);
-                            localStorage.setItem('botbuddy-user', username.trim());
-                          }
-                        }}
-                        disabled={!username.trim()}
-                        className="px-4 bg-foreground text-background text-xs font-mono uppercase tracking-widest disabled:opacity-50"
-                      >
-                        Login
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-
-
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">Select Active Model</label>
-                    <div className="relative">
-                      <select
-                        value={selectedModel}
-                        onChange={(e) => {
-                          setSelectedModel(e.target.value);
-                          localStorage.setItem('botbuddy-model', e.target.value);
-                        }}
-                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground appearance-none cursor-pointer"
-                      >
-                        <option className="bg-background text-foreground" value="gemini-3-flash-preview">Gemini 3 Flash</option>
-                        <option className="bg-background text-foreground" value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-                        <option className="bg-background text-foreground" value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash</option>
-                        <option className="bg-background text-foreground" value="claude-4-5-sonnet-beta">Claude Sonnet 4.5 Beta</option>
-                        <option className="bg-background text-foreground" value="toqan-agent">Toqan Agent</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 pt-2 border-t border-border">
-                    <label className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
-                      {selectedModel.startsWith('claude') ? 'Claude API Key' : selectedModel === 'toqan-agent' ? 'Toqan API Key' : 'Gemini API Key'}
-                    </label>
-                    {selectedModel.startsWith('claude') ? (
-                      <input
-                        type="password"
-                        value={claudeApiKey}
-                        onChange={(e) => {
-                          setClaudeApiKey(e.target.value);
-                          if (e.target.value) localStorage.setItem('botbuddy-claude-api-key', e.target.value);
-                          else localStorage.removeItem('botbuddy-claude-api-key');
-                        }}
-                        placeholder="Enter your Claude API key"
-                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
-                      />
-                    ) : selectedModel === 'toqan-agent' ? (
-                      <input
-                        type="password"
-                        value={toqanApiKey}
-                        onChange={(e) => {
-                          setToqanApiKey(e.target.value);
-                          if (e.target.value) localStorage.setItem('botbuddy-toqan-api-key', e.target.value);
-                          else localStorage.removeItem('botbuddy-toqan-api-key');
-                        }}
-                        placeholder="Enter your Toqan API key"
-                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
-                      />
-                    ) : (
-                      <input
-                        type="password"
-                        value={userApiKey}
-                        onChange={(e) => {
-                          setUserApiKey(e.target.value);
-                          if (e.target.value) localStorage.setItem('botbuddy-api-key', e.target.value);
-                          else localStorage.removeItem('botbuddy-api-key');
-                        }}
-                        placeholder="Enter your Gemini API key"
-                        className="w-full bg-transparent border border-border p-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-foreground"
-                      />
-                    )}
-                    <p className="text-[10px] text-muted-foreground font-mono leading-relaxed">
-                      Leave empty to use the default system key. Your key is stored locally in your browser and never sent to our servers.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-4 border-t border-border">
-                <button
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="px-6 py-3 text-xs font-mono tracking-widest uppercase bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <SettingsModal 
+        isOpen={isSettingsOpen}
+        setIsOpen={setIsSettingsOpen}
+        userApiKey={userApiKey}
+        setUserApiKey={setUserApiKey}
+        claudeApiKey={claudeApiKey}
+        setClaudeApiKey={setClaudeApiKey}
+        toqanApiKey={toqanApiKey}
+        setToqanApiKey={setToqanApiKey}
+        isLoggedIn={isLoggedIn}
+        setIsLoggedIn={setIsLoggedIn}
+        username={username}
+        setUsername={setUsername}
+        selectedModel={selectedModel}
+        setSelectedModel={setSelectedModel}
+      />
     </MotionConfig>
   );
 }

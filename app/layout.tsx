@@ -7,9 +7,9 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: '',
-  description: '',
-  generator: '',
+  title: 'Bot Buddy',
+  description: 'Your AI Assistant',
+  generator: 'Bot Buddy',
   icons: {
     icon: [
       {
