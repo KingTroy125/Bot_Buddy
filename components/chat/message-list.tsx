@@ -5,6 +5,7 @@ import { Bot, User } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { Message } from './types';
+import AIThinking from './ai-thinking';
 
 interface MessageListProps {
   messages: Message[];
@@ -104,11 +105,7 @@ export function MessageList({
               <Bot size={12} />
               <span>BotBuddy</span>
             </div>
-            <div className="bg-background border border-border px-5 py-4 flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-1.5 h-1.5 bg-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-1.5 h-1.5 bg-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
+            <AIThinking className="w-full max-w-[90%] md:max-w-[85%]" />
           </motion.div>
         )}
         <div ref={messagesEndRef} />
