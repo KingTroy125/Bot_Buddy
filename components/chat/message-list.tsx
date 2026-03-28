@@ -20,6 +20,13 @@ export function MessageList({
   messagesEndRef,
   setInput,
 }: MessageListProps) {
+  // Show the thinking animation only while waiting for the bot to start responding.
+  // Once the model message has content (streaming has begun), hide it.
+  const lastMessage = messages[messages.length - 1];
+  const isThinking =
+    isLoading &&
+    (!lastMessage || lastMessage.role !== 'model' || lastMessage.content === '');
+
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
       <div className="max-w-3xl mx-auto w-full space-y-8 pb-20">
@@ -95,7 +102,7 @@ export function MessageList({
             </motion.div>
           ))
         )}
-        {isLoading && (
+        {isThinking && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
