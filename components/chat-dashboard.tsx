@@ -18,6 +18,7 @@ export default function ChatDashboard() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   // Settings state
@@ -172,7 +173,7 @@ export default function ChatDashboard() {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if ((!input.trim() && attachments.length === 0) || isLoading) return;
+    if ((!input.trim() && attachments.length === 0) || isLoadingRef.current) return;
 
     const userMessageContent = input.trim();
     
@@ -187,6 +188,7 @@ export default function ChatDashboard() {
     setInput('');
     setAttachments([]);
     setIsLoading(true);
+    isLoadingRef.current = true;
 
     let currentChatId = activeChatId;
     let isNewChat = false;
@@ -226,6 +228,15 @@ export default function ChatDashboard() {
     }));
 
     try {
+      // Local check before fetching to prevent the "thinking" flash
+      if (selectedModel === 'toqan-agent' && !toqanApiKey?.trim()) {
+        throw new Error('missing_api_key');
+      } else if (selectedModel?.startsWith('claude') && !claudeApiKey?.trim()) {
+        throw new Error('missing_api_key');
+      } else if (!selectedModel?.startsWith('claude') && selectedModel !== 'toqan-agent' && !userApiKey?.trim() && !process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+        throw new Error('missing_api_key');
+      }
+
       // Get chat history for context
       const currentChat = chats.find(c => c.id === currentChatId);
       const history = currentChat?.messages.map(m => ({
@@ -392,6 +403,7 @@ export default function ChatDashboard() {
       }));
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
