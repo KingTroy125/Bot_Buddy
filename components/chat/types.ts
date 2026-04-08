@@ -19,4 +19,19 @@ export type Chat = {
   messages: Message[];
   updatedAt: number;
   toqanConversationId?: string;
+  agentId?: string; // Optional: Link chat to an agent
+};
+
+export type Agent = {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  icon?: string;
+  isExample?: boolean;
+  isPinned?: boolean;
+  owner?: string;
+  files?: { name: string; url: string; size: number }[];
+  updatedAt: number;
 };

@@ -7,7 +7,8 @@ const SYSTEM_INSTRUCTION = "You are BotBuddy, a helpful, friendly, and intellige
 
 export async function POST(req: Request) {
   try {
-    const { messages, userApiKey, selectedModel, claudeApiKey, toqanApiKey, toqanConversationId } = await req.json();
+    const { messages, userApiKey, selectedModel, claudeApiKey, toqanApiKey, toqanConversationId, systemInstruction } = await req.json();
+    const effectiveSystemInstruction = systemInstruction || SYSTEM_INSTRUCTION;
 
     if (selectedModel === 'toqan-agent') {
       const apiKeyToUse = toqanApiKey || process.env.TOQAN_API_KEY;
@@ -17,14 +18,22 @@ export async function POST(req: Request) {
       }
 
       const lastMessage = messages[messages.length - 1];
-      const userMessage = lastMessage.content;
+      const isFirstTurn = !toqanConversationId;
+
+      // Toqan has no native system prompt support.
+      // On the FIRST turn, prepend the agent persona so Toqan's context window
+      // gets the instructions. On follow-up turns, Toqan remembers the conversation
+      // via its conversation_id — so we skip re-injecting, which avoids bloat.
+      const userMessage = isFirstTurn && effectiveSystemInstruction && effectiveSystemInstruction !== SYSTEM_INSTRUCTION
+        ? `You are acting as the following AI agent. Always stay in character.\n\n${effectiveSystemInstruction}\n\n---\n\nUser message: ${lastMessage.content}`
+        : lastMessage.content;
       
-      const endpoint = toqanConversationId 
-        ? 'https://api.toqan.ai/api/continue_conversation' 
-        : 'https://api.toqan.ai/api/create_conversation';
+      const endpoint = isFirstTurn
+        ? 'https://api.toqan.ai/api/create_conversation' 
+        : 'https://api.toqan.ai/api/continue_conversation';
 
       const body: any = { user_message: userMessage };
-      if (toqanConversationId) {
+      if (!isFirstTurn) {
         body.conversation_id = toqanConversationId;
       }
 
@@ -127,7 +136,7 @@ export async function POST(req: Request) {
           }
           return { role: 'user', content: m.content };
         }),
-        system: SYSTEM_INSTRUCTION,
+        system: effectiveSystemInstruction,
         stream: true
       });
 
@@ -186,7 +195,7 @@ export async function POST(req: Request) {
       model: selectedModel || 'gemini-3-flash-preview',
       contents: contents,
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: effectiveSystemInstruction,
       }
     });
 

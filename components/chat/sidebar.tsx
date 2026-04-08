@@ -24,6 +24,8 @@ interface SidebarProps {
   isLoggedIn: boolean;
   username: string;
   setIsSettingsOpen: (open: boolean) => void;
+  activeView: 'chat' | 'agents';
+  setActiveView: (view: 'chat' | 'agents') => void;
 }
 
 export function Sidebar({
@@ -37,6 +39,8 @@ export function Sidebar({
   isLoggedIn,
   username,
   setIsSettingsOpen,
+  activeView,
+  setActiveView,
 }: SidebarProps) {
   return (
     <AnimatePresence mode="wait">
@@ -62,13 +66,27 @@ export function Sidebar({
             </button>
           </div>
 
-          <div className="p-4 border-b border-border">
+          <div className="p-4 border-b border-border flex flex-col gap-2">
             <button
-              onClick={createNewChat}
+              onClick={() => {
+                setActiveView('chat');
+                createNewChat();
+              }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-foreground hover:bg-foreground/90 text-background transition-colors text-xs font-mono tracking-widest uppercase"
             >
               <Plus size={14} />
               New Chat
+            </button>
+            <button
+              onClick={() => setActiveView('agents')}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2 transition-colors text-xs font-mono tracking-widest uppercase border ${
+                activeView === 'agents' 
+                  ? 'bg-muted border-border text-foreground' 
+                  : 'bg-transparent border-transparent hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Bot size={14} />
+              Explore Agents
             </button>
           </div>
 
@@ -82,6 +100,7 @@ export function Sidebar({
                 <div
                   key={chat.id}
                   onClick={() => {
+                    setActiveView('chat');
                     setActiveChatId(chat.id);
                     if (typeof window !== 'undefined' && window.innerWidth < 768) setIsSidebarOpen(false);
                   }}

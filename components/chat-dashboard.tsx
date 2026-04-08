@@ -11,7 +11,34 @@ import { ChatHeader } from './chat/chat-header';
 import { MessageList } from './chat/message-list';
 import { MessageInput } from './chat/message-input';
 import { SettingsModal } from './chat/settings-modal';
-import { Attachment, Message, Chat } from './chat/types';
+import { Attachment, Message, Chat, Agent } from './chat/types';
+import { AgentsSection } from './chat/agents-section';
+
+// Builds a complete system prompt from an agent definition so the model
+// knows exactly who it is, fully adopts the persona, and never breaks character.
+function buildAgentSystemPrompt(agent: Agent): string {
+  return `# ROLE ASSIGNMENT — MANDATORY
+
+You are operating as a custom AI agent called **${agent.name}**. This is your sole identity for this entire conversation.
+
+## Your Identity
+**Name:** ${agent.name}
+${agent.description?.trim() ? `**Description:** ${agent.description.trim()}` : ''}
+
+## Your Instructions
+${agent.instructions?.trim() || 'Be a helpful and knowledgeable assistant focused on your defined specialty.'}
+
+## CRITICAL RULES — NEVER VIOLATE
+1. You ARE ${agent.name}. This is your name. You have NO other name.
+2. You were NOT created by Anthropic, Google, or any AI company. You are a custom AI agent built specifically for this purpose.
+3. If asked "who are you", "what are you", or "what is your name" — answer ONLY as ${agent.name}.
+4. NEVER mention Claude, GPT, Gemini, Anthropic, Google, or any AI company.
+5. NEVER say you are an AI assistant "created by Anthropic" or "made by Google" etc.
+6. Stay completely in character at all times. There is no underlying model — you are simply ${agent.name}.
+7. Your entire identity, knowledge, and responses must align with the instructions above.
+
+Begin every interaction as ${agent.name}.`;
+}
 
 export default function ChatDashboard() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -20,6 +47,9 @@ export default function ChatDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const isLoadingRef = useRef(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activeView, setActiveView] = useState<'chat' | 'agents'>('chat');
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -53,6 +83,40 @@ export default function ChatDashboard() {
         console.error('Failed to parse chats', e);
       }
     }
+
+    const savedAgents = localStorage.getItem('botbuddy-agents');
+    if (savedAgents) {
+      try {
+        setAgents(JSON.parse(savedAgents));
+      } catch (e) {
+        console.error('Failed to parse agents', e);
+      }
+    } else {
+      // Default example agents
+      const examples: Agent[] = [
+        {
+          id: 'example-1',
+          name: 'Takealot Customer Support Agent',
+          description: 'An AI assistant that delivers expert support to Takealot customers, ensuring compliance with official policies.',
+          instructions: 'You are a dedicated Takealot Customer Support Agent...',
+          model: 'claude-3-5-sonnet',
+          isExample: true,
+          owner: 'System',
+          updatedAt: Date.now()
+        },
+        {
+          id: 'example-2',
+          name: 'CodeGuardian',
+          description: 'A dedicated AI agent for reviewing code quality, ensuring best practices, and enhancing performance.',
+          instructions: 'You are an expert code reviewer...',
+          model: 'gemini-3-flash-preview',
+          isExample: true,
+          owner: 'System',
+          updatedAt: Date.now()
+        }
+      ];
+      setAgents(examples);
+    }
     
     const savedKey = localStorage.getItem('botbuddy-api-key');
     if (savedKey) setUserApiKey(savedKey);
@@ -73,7 +137,7 @@ export default function ChatDashboard() {
     if (savedModel) setSelectedModel(savedModel);
   }, []);
 
-  // Save chats to localStorage whenever they change
+  // Save chats and agents to localStorage whenever they change
   useEffect(() => {
     if (chats.length > 0) {
       localStorage.setItem('botbuddy-chats', JSON.stringify(chats));
@@ -81,6 +145,12 @@ export default function ChatDashboard() {
       localStorage.removeItem('botbuddy-chats');
     }
   }, [chats]);
+
+  useEffect(() => {
+    if (agents.length > 0) {
+      localStorage.setItem('botbuddy-agents', JSON.stringify(agents));
+    }
+  }, [agents]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -228,17 +298,37 @@ export default function ChatDashboard() {
     }));
 
     try {
+      // Resolve if an agent is selected via the dropdown (agent:ID convention)
+      const currentChat = chats.find(c => c.id === currentChatId);
+      let agentModel = selectedModel;
+      let resolvedInstructions: string | null = null;
+
+      if (selectedModel.startsWith('agent:')) {
+        const agentId = selectedModel.replace('agent:', '');
+        const agent = agents.find(a => a.id === agentId);
+        if (agent) {
+          agentModel = agent.model;
+          resolvedInstructions = buildAgentSystemPrompt(agent);
+        }
+      } else if (currentChat?.agentId) {
+        // Fallback: chat was created by clicking "Chat with Agent"
+        const agent = agents.find(a => a.id === currentChat.agentId);
+        if (agent) {
+          agentModel = agent.model;
+          resolvedInstructions = buildAgentSystemPrompt(agent);
+        }
+      }
+
       // Local check before fetching to prevent the "thinking" flash
-      if (selectedModel === 'toqan-agent' && !toqanApiKey?.trim()) {
+      if (agentModel === 'toqan-agent' && !toqanApiKey?.trim()) {
         throw new Error('missing_api_key');
-      } else if (selectedModel?.startsWith('claude') && !claudeApiKey?.trim()) {
+      } else if (agentModel?.startsWith('claude') && !claudeApiKey?.trim()) {
         throw new Error('missing_api_key');
-      } else if (!selectedModel?.startsWith('claude') && selectedModel !== 'toqan-agent' && !userApiKey?.trim() && !process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+      } else if (!agentModel?.startsWith('claude') && agentModel !== 'toqan-agent' && !userApiKey?.trim() && !process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
         throw new Error('missing_api_key');
       }
 
       // Get chat history for context
-      const currentChat = chats.find(c => c.id === currentChatId);
       const history = currentChat?.messages.map(m => ({
         role: m.role,
         content: m.content,
@@ -255,10 +345,11 @@ export default function ChatDashboard() {
         body: JSON.stringify({
           messages,
           userApiKey: userApiKey?.trim(),
-          selectedModel,
+          selectedModel: agentModel,
           claudeApiKey: claudeApiKey?.trim(),
           toqanApiKey: toqanApiKey?.trim(),
           toqanConversationId: activeChat?.toqanConversationId,
+          systemInstruction: resolvedInstructions ?? undefined,
         }),
       });
 
@@ -468,37 +559,62 @@ export default function ChatDashboard() {
               isLoggedIn={isLoggedIn}
               username={username}
               setIsSettingsOpen={setIsSettingsOpen}
+              activeView={activeView}
+              setActiveView={setActiveView}
             />
 
-            {/* Main Chat Area */}
+            {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 relative bg-background">
-              <ChatHeader 
-                activeChatTitle={activeChat?.title || 'New Chat'}
-                isSidebarOpen={isSidebarOpen}
-                setIsSidebarOpen={setIsSidebarOpen}
-                selectedModel={selectedModel}
-                setSelectedModel={setSelectedModel}
-              />
+              {activeView === 'chat' ? (
+                <>
+                  <ChatHeader 
+                    activeChatTitle={activeChat?.title || 'New Chat'}
+                    isSidebarOpen={isSidebarOpen}
+                    setIsSidebarOpen={setIsSidebarOpen}
+                    selectedModel={selectedModel}
+                    setSelectedModel={setSelectedModel}
+                    agents={agents}
+                  />
 
-              <MessageList 
-                messages={activeChat?.messages || []}
-                isLoading={isLoading}
-                messagesEndRef={messagesEndRef}
-                setInput={setInput}
-              />
+                  <MessageList 
+                    messages={activeChat?.messages || []}
+                    isLoading={isLoading}
+                    messagesEndRef={messagesEndRef}
+                    setInput={setInput}
+                  />
 
-              <MessageInput 
-                input={input}
-                setInput={setInput}
-                attachments={attachments}
-                handleFileChange={handleFileChange}
-                handleRemoveAttachment={handleRemoveAttachment}
-                handleSubmit={handleSubmit}
-                isLoading={isLoading}
-                textareaRef={textareaRef}
-                fileInputRef={fileInputRef}
-                handleKeyDown={handleKeyDown}
-              />
+                  <MessageInput 
+                    input={input}
+                    setInput={setInput}
+                    attachments={attachments}
+                    handleFileChange={handleFileChange}
+                    handleRemoveAttachment={handleRemoveAttachment}
+                    handleSubmit={handleSubmit}
+                    isLoading={isLoading}
+                    textareaRef={textareaRef}
+                    fileInputRef={fileInputRef}
+                    handleKeyDown={handleKeyDown}
+                  />
+                </>
+              ) : (
+                <AgentsSection 
+                  agents={agents}
+                  setAgents={setAgents}
+                  onStartChat={(agent: Agent) => {
+                    const newChat: Chat = {
+                      id: crypto.randomUUID(),
+                      title: `Chat with ${agent.name}`,
+                      messages: [],
+                      updatedAt: Date.now(),
+                      agentId: agent.id,
+                    };
+                    setChats(prev => [newChat, ...prev]);
+                    setActiveChatId(newChat.id);
+                    setActiveView('chat');
+                    // Add system message or initial greeting if needed
+                  }}
+                />
+              )}
             </div>
 
             {/* Mobile Sidebar Overlay */}
